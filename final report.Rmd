@@ -1,0 +1,327 @@
+---
+title: The voter turnout in the 2019 Canadian Federal Election has an impact on the
+  election results
+author: "Yangle Shang"
+date: "12/22/2020"
+output:
+  pdf_document: default
+---
+Code and data supporting of this analysis is available at: https://github.com/shang0908/The-voter-turnout-in-the-2019-Canadian-Federal-Election-has-an-impact-on-the-election-results
+    
+```{r, include=FALSE}
+library(tidyverse)
+library(lme4)
+library(pROC)
+library(arm)
+# load reduced survey data
+survey_data <- read.csv("survey_data.csv")
+# load reduced census data
+census_data <- read.csv("census_data.csv")
+```
+## Abstract
+Based on the Canadian Election Survey[1] and the post-stratification data - Canada 2016 Education Census Statistics[2], I would like to analyze the voter turnout in the federal election did not have an impact on the outcome of the election. In this entire report, statistical approach like multilevel modelling, post-stratification, binned residual plot are used to attain the final election results, which shows that Liberal Party still wins the election. The election outcome is consistent with the actual 2019 Canadian Federal Election, Justin Trudeau won re-election as a Prime minister of Canada[3].
+
+## Keywords
+Multilevel Regression with Post-stratification, Election Result, Census Data, Survey Data, ROC curve, Binned Residual Plot
+
+## Introduction
+Canada is a representative democracy. During every four years' presidential election, all eligible Canadian citizens have the right to vote in their electoral district[4]. A chunk of reasons revealed why Canadians chose not to vote in political elections. They just lacked interest and knowledge, and did not care who won the election, or their beliefs were not represented by the parties and candidates, which led to disillusionment. Additional reasons included trust, people may be less trusting of government officials to do the right thing and dissatisfy the government behaviors[5]. As a result, if "every citizens" voted, how was the results of 2019 Canadian Federal Election look like?
+
+"Everyone" means all of the Canadian citizens who had the right to vote for 2019 Canadian Federal Election. In this report, I build different models and use to prove that the 2019 Canada Election results would be the same as the reality if everyone represented their own opinion and chose to vote for the election. The following analyzation are all based on the assumption of voter turnout in the election equals to the population of all of the Canadian citizens who had the right to vote and exercised it.
+
+It is obvious that there are known differences between all of the citizens who have the right to vote in 2019 Canadian Federal Election and people who actual exercise the right to vote. In order to deal with this problem, a statistical technique called multilevel regression can be used to solve it. First, applying multilevel logistic model on 2019 Canadian Election Survey, then by the collection of census data, applying multilevel regression on that dataset, this process is called post-stratification. It is a statistical technique to correct estimates about election results if everyone choose to vote.
+
+Two data sets about survey data and census data will be used to investigate why the election results had no difference with the actual one. In the Methodology section, I describe the data procession before modelling, and the models that used to applying on "everyone". In the end, I will discuss weaknesses and make a conclusion and learn about the importance of voter turnout based on those model and results.
+
+## Methodology
+### Data
+I obtain the survey data by downloading Canadian Election Survey[1]. Moreover, there are 37822 observations and 620 variables in this dataset that covers important factors which relate to the choice of vote for election. The variables can be expressed as following main concepts: cps19_yob, cps19_gender, cps19_province, cps19_education, cps19_votechoice. cps19_yob represents year of birth. It is important since the following logistic models based on age region. The target population for the Education Highlight Table 2016 census produced by Statistics[2] included "everyone" who have the right to vote. However, there is a limitation about 3 years passed since the version has released. In the list of 20 variables, the useful variables which corresponding to those five CES selected variables are called Geographic name, Age, Sex, Total - Highest certificate, diploma or degree (2016 counts), No certificate, diploma or degree (2016 counts), Secondary (high) school diploma or equivalency certificate (2016 counts), Apprenticeship or trades certificate or diploma (2016 counts), College, CEGEP or other non-university certificate or diploma (2016 counts), University certificate or diploma below bachelor level (2016 counts). 
+
+In order to be consistent with the characteristics of census data, it is necessary to process the survey data. As the census data shows the specific age group, I change the numeric variable Age in the survey data into the age group. It is necessary to drop the observations which have the value of Other (e.g. Trans, non-binary, two-spirit, gender-queer) in the cps19_gender and rename its values into Male and Female, and delete the values Don't know/ Prefer not to answer of cps19_votechoice which does not have a contribution for the election. Since there are many kinds of education level in the survey data, I sort them into the same categories as the census data. I separate the values of cps19_votechoice into five different groups so that continuing with the following vote counts. Five groups are called vote_green, vote_lib, vote_con, vote_ndp and vote_bloc. "1" represents the person who voted for one of them, otherwise "0" is shown. Since the repeatability of variable Age and Sex in the census data, I drop the rows which contain All ages, 15-plus, 25 to 64, and Both sexes. Variable called total_count means the number of people who match those conditions of different age, sex, education and province. Both of the names of province are processed as abbreviations so that they are more readable.
+
+### Model
+I make the specific vote choice into five groups. In order to enhance the accuracy, the model and choose the most fitted one, I decide to build random intercept multilevel logistic regression model about votes for each Party by Frequentist Approach. The following five statements (Model.1 ~ Model.5) show the notations of each model. 
+$$P(Y_{i}={Green}) =logit^{-1}(\beta_0 + X^{Age}_{ij} +\beta^{Province}_{ij}+\beta^{Sex}_{ij}+\beta^{education}_{ij})$$
+Model.1. model for vote_green
+
+$$P(Y_{i}={Liberal\ Party}) =logit^{-1}(\beta_0 + X^{Age}_{ij} +\beta^{Province}_{ij}+\beta^{Sex}_{ij}+\beta^{education}_{ij})$$
+Model.2. model for vote_lib
+
+$$P(Y_{i}={Conservative\ Party}) =logit^{-1}(\beta_0 + X^{Age}_{ij} +\beta^{Province}_{ij}+\beta^{Sex}_{ij}+\beta^{education}_{ij})$$
+Model.3. model for vote_con
+
+$$P(Y_{i}={ndp}) =logit^{-1}(\beta_0 + X^{Age}_{ij} +\beta^{Province}_{ij}+\beta^{Sex}_{ij}+\beta^{education}_{ij})$$
+Model.4. model for vote_ndp
+
+$$P(Y_{i}={Bloc\ Québécois}) =logit^{-1}(\beta_0 + X^{Age}_{ij} +\beta^{Province}_{ij}+\beta^{Sex}_{ij}+\beta^{education}_{ij})$$
+Model.5. model for vote_bloc
+
+I choose all of the correlated variables as I selected before in the Data section. In the model $\beta_0$ represents the coefficient mean/baseline and $\beta_{ij}$ means corresponding random variables which follow the normal distribution with mean 0 and its own variance. $X^{Age}_{ij}$ states the random effects for each individual i in age group j. The slope/coefficient of each $\beta_{ij}$ describes change in log odds for every one unit increase in each predictor variable. Log-odds[6] is the logarithm of the odds, namely, equals to log(p/1-p), p is the probability of event occuring. 
+
+Since there are five different models, the receiving operating characteristic (ROC) curve[7] can be used to check the diagnostic ability of them. Figure.1 shows the ROC curve by plotting the sensitivity (true positive rage) against 1-specificity (true negative fate). The AUC values which represent the area under ROC curve are 0.636 for "Green Model", 0,616 for "Liberal Model", 0.686 for "Conservative Model", 0.667 for "ndp Model" and "0.929" for "Bloc Québécois Model". These numeric numbers mean the chance to discriminate among five parties getting votes or not. The larger AUC value, the better regression logistic model made, the higher accuracy represented, so the model for Bloc Québécois Party is the best one as the AUC value 0.929 is much closer to 1. By plotting binned plots of Bloc Québécois model (Figure.2), I am able to check the residuals. The gray lines express ±2SE bands, which I would expect to contain about 85% of survey data about vote for five different parties. Since the majority of the fitted values fall within the SE bands, the model is reasonable.
+```{r, include=FALSE}
+# create models
+model_logit_1 <- glmer(vote_green ~ Province + Sex + education + (1|Age),
+                       data = survey_data,
+                       family = binomial)
+summary(model_logit_1)
+
+model_logit_2 <- glmer(vote_lib ~ Province + Sex + education + (1|Age),
+                       data = survey_data,
+                       family = binomial)
+summary(model_logit_2)
+
+model_logit_3 <- glmer(vote_con ~ Province + Sex + education + (1|Age),
+                       data = survey_data,
+                       family = binomial)
+summary(model_logit_3)
+
+model_logit_4 <- glmer(vote_ndp ~ Province + Sex + education + (1|Age),
+                       data = survey_data,
+                       family = binomial)
+summary(model_logit_4)
+
+model_logit_5 <- glmer(vote_bloc ~ Province + Sex + education + (1|Age),
+                       data = survey_data,
+                       family = binomial)
+summary(model_logit_5)
+```
+
+```{r, include=FALSE}
+# check models
+prob1 <- predict(model_logit_1, type = c("response"))
+prob2 <- predict(model_logit_2, type = c("response"))
+prob3 <- predict(model_logit_3, type = c("response"))
+prob4 <- predict(model_logit_4, type = c("response"))
+prob5 <- predict(model_logit_5, type = c("response"))
+# calculate auc values
+roc1 <- roc(survey_data$vote_green, prob1)
+auc(roc1)
+roc2 <- roc(survey_data$vote_lib, prob2)
+auc(roc2)
+roc3 <- roc(survey_data$vote_con, prob3)
+auc(roc3)
+roc4 <- roc(survey_data$vote_ndp, prob4)
+auc(roc4)
+roc5 <- roc(survey_data$vote_bloc, prob5)
+auc(roc5)
+```
+
+```{r,echo=FALSE, message=F}
+# draw the ROC curve for five parties
+par(mfrow=c(1,3))
+plot(roc1, auc.polygon=TRUE, print.auc = TRUE, asp = NA, auc.polygon.col = "red")
+plot(roc2, auc.polygon=TRUE, print.auc = TRUE, asp = NA, auc.polygon.col = "yellow")
+plot(roc3, auc.polygon=TRUE, print.auc = TRUE, asp = NA, auc.polygon.col = "green")
+par(mfrow=c(1,2))
+plot(roc4, auc.polygon=TRUE, print.auc = TRUE, asp = NA, auc.polygon.col = "blue")
+plot(roc5, auc.polygon=TRUE, print.auc = TRUE, asp = NA, auc.polygon.col = "purple")
+```
+
+Figure.1. ROC curves for Green Model(red plot), Liberal Model(yellow plot), Conservative Model(green plot), ndp Model(blue plot) and Bloc Québécois Model(purple plot)
+
+```{r, echo=FALSE, message=F}
+# draw the binnedplot for Bloc Québécois model
+binnedplot(fitted(model_logit_5), residuals(model_logit_5, type = "response"),
+           nclass = NULL, xlab = "Expected Values", ylab = "Average residual", 
+           main = "Binned residual plot for Bloc Québécois Party", 
+           cex.pts = 0.8, 
+           col.pts = 1, 
+           col.int = "gray")
+```
+
+Figure.2. Binned residual plot for Bloc Québécois Party
+
+After the construction of multilevel logistic regression models, post-stratification should be used to correct for sampling bias in the CES survey data as it did not reflect the whole situation of votes for election if every eligible citizen voted, it is just a method to adjust the sampling weights. By choosing four related factors, age, province, sex and education, each citizen will match a specific condition which produced by previous model, then the probability of post-stratification estimate can be calculated, called greenestimate, libestimate, conestimate, ndpestimate and blocestimate. The values of these five columns represent the probability that each person of different level of age, sex, education and province would vote for each of the five parties. As a result, each person who voted for one of the five parties is feasible by choosing the highest numeric value among five post-stratification estimates. Based on different age groups, there existed a winner party which most people of that age group were chosen. By sum the votes, I could get the result when "everyone" voted.
+```{r, include=FALSE}
+# estimate chance of voting for five parties
+census_data$greenestimate <- model_logit_1 %>%
+  predict(newdata=census_data, type="response")
+census_data$libestimate <- model_logit_2 %>%
+  predict(newdata=census_data, type="response")
+census_data$conestimate <- model_logit_3 %>%
+  predict(newdata=census_data, type="response")
+census_data$ndpestimate <- model_logit_4 %>%
+  predict(newdata=census_data, type="response")
+census_data$blocestimate <- model_logit_5 %>%
+  predict(newdata=census_data, type="response")
+```
+
+```{r, include=FALSE}
+# final votes
+census_data <- census_data %>% 
+  mutate(vote_pred=
+           case_when(
+            census_data$greenestimate > census_data$libestimate &
+            census_data$greenestimate > census_data$conestimate &
+            census_data$greenestimate > census_data$ndpestimate &
+            census_data$greenestimate > census_data$blocestimate ~ "Green Party",
+            census_data$libestimate > census_data$greenestimate &
+            census_data$libestimate > census_data$conestimate &
+            census_data$libestimate > census_data$ndpestimate &
+            census_data$libestimate > census_data$blocestimate ~ "Liberal Party",
+            census_data$conestimate > census_data$greenestimate &
+            census_data$conestimate > census_data$libestimate &
+            census_data$conestimate > census_data$ndpestimate &
+            census_data$conestimate > census_data$blocestimate ~ "Conservative Party",
+            census_data$ndpestimate > census_data$greenestimate &
+            census_data$ndpestimate > census_data$libestimate &
+            census_data$ndpestimate > census_data$conestimate &
+            census_data$ndpestimate > census_data$blocestimate ~ "ndp",
+            census_data$blocestimate > census_data$greenestimate &
+            census_data$blocestimate > census_data$libestimate &
+            census_data$blocestimate > census_data$conestimate &
+            census_data$blocestimate > census_data$ndpestimate ~ "Bloc Québécois",
+            TRUE ~ as.character(vote_pred)
+           )
+  )
+```
+
+```{r, include=FALSE}
+# add the total_count to get number of people that the respondents represent
+census_data$greenvotes <- ifelse(census_data$vote_pred == "Green Party", 
+                                 census_data$total_count, 0)
+census_data$libvotes <- ifelse(census_data$vote_pred == "Liberal Party", 
+                                 census_data$total_count, 0)
+census_data$convotes <- ifelse(census_data$vote_pred == "Conservative Party", 
+                                 census_data$total_count, 0)
+census_data$ndpvotes <- ifelse(census_data$vote_pred == "ndp", 
+                                 census_data$total_count, 0)
+census_data$blocvotes <- ifelse(census_data$vote_pred == "Bloc Québécois", 
+                                 census_data$total_count, 0)
+```
+
+## Results
+There are 32,461,120 effective votes for 2019 Canadian Federal elections in total, Liberal Party will win 21,348,740 votes. Table.1. shows the exact number of vote counts for each of the five parties. As a result, our estimate of voter turnout for Liberal Party is 0.6577, based off the post-stratification analysis on the random intercept logistic regression model above. In order to check consistency with the election results based on the cell of age group, Table.2 implemented. In total, there are four different age groups called 25 to 34, 35 to 44, 45 to 54 and 55 to 64. Checking the situation of voting among each age group whether it follows the trend of Liberal Party wins the election to a large degree. The trend of this table tells me Liberal Party wins by large margins. The percentage of winning the election are 66.78%, 69.73%, 61.59%, 65.64% from the youngest to the oldest age groups. It is another level to prove the rationality of setting the age group as cell in the regression logistic models before.
+
+```{r, echo=FALSE, message=F}
+# total votes based on different parties
+elec_result <- census_data %>%
+  summarise(Green = sum(greenvotes), Liberal = sum(libvotes), Conservative = sum(convotes),
+            ndp = sum(ndpvotes), Bloc = sum(blocvotes))
+elec_result
+```
+
+Table.1. final election results of five parties in total 
+```{r, echo=FALSE, message=F}
+# total votes based on different age groups
+elec_result_age <- census_data %>% group_by(Age) %>%
+  summarise(Green = sum(greenvotes), Liberal = sum(libvotes), Conservative = sum(convotes),
+            ndp = sum(ndpvotes), Bloc = sum(blocvotes))
+elec_result_age
+```
+
+Table.2. final election results sorted by different age groups
+
+The regression model shows that Liberal Party would win the election, obtaining 65.77% votes. This election results lead to the conclusion that the 2019 Canadian Federal Election would have been no difference if "everyone" had voted. The fact about election is that Justin Trudeau's Liberal Party has retained power in Canadian election win. The Liberals won 157 seats in the 338-seat parliament[8], which turnout was listed at 46.44%.
+
+Eventually, the importance of turnout is necessary since the election results based on the models is consistent with the actual outcome. A report made by CBC news[9] explained how voter turnout affect who would win the Canadian Election on October, 2019.People in different age groups have different voting preferences, youth turnout helped Liberals win in 2015, but older voters still key to winning in 2019. The election results did not rely on one kind of age group of voters. Another reason showed why the contribution of the old to the election results important was the demographic trends was getting older, older people made a big contribution to the outcome. If some clusters of people did not have enough aspiration to vote for federal election in Canada, the final election results might be changed.
+
+## Discussion
+### Summary
+In order to predict the 2016 Canadian Federal Election results and explain the importance of turnout. At first, I choose the CES[1] as survey data and 2016 Education Census Statistics[2] as census data, cleaning and dealing with the variables. Based on these processed data, I build multilevel logistic regression models applied on census data by different age groups. Post-stratification is used to correct the bias since the survey data could not represent the whole population (shown in the Weakness & Next Steps section) The eventual election result is that Liberal Party would win at 65.77% votes.
+
+### Conclusions
+The answer to the models shows that the proportion of voters in favor of voting for Liberal Party of Canada to be 0.6577 based on the multilevel regression with post-stratification analysis, which is the same as reality - Justin Trudeau acts as Liberal Party who won the 2019 Canadian Federal Election. 
+
+Although some citizens did not satisfy the performances of Canadian Government, even you ever thought that just one vote in a sea of millions cannot make much of a difference. When the Election Day approached in every four years, voting is your civic duty and it really does matter[10]. Each vote may not determine the direct election of the Prime Minister, but the vote definitely joins into the 338 single-member constituencies, so each vote undoubtedly plays an important role in the election results.[11]
+
+### Weakness & Next Steps
+Comparing with the election results, there are data gaps between the models and the fact since the weakness exists. Despite the large sample size, the pool of survey respondents is far from being representative of the target population, leading the problem of non-representative polls. Too many NAs in the dataset is another drawback, which cannot make any contributions to our analysis. After eliminating these NAs, the number of analyzable variables and observations decreases, which influence the accuracy of the multilevel regression model, so when the post-stratification is being processing, the final election results will not be accurate. Additionally, defects in the previous models lead to inaccurate final outcome as there are so many potential factors that affect the election, such as occupation, race are not collected in these datasets. 
+
+To some extent, the election results cannot be controlled while economic and political factors are difficult to be quantitative. Census data could not be conducted frequently due to time constraints and cost effects. The greatest method of enhancing the representation of survey data is collecting more kinds of people with different conditions by adding contents of survey. Actually, the method of multilevel regression model with post-stratification solves the biased data, it is reasonable to increase accuracy of logistic model by increasing more predictors.
+
+## References
+
+[1]Stephenson, Laura B; Harell, Allison; Rubenson, Daniel; Loewen, Peter John, 2020, "2019 Canadian Election Study - Online Survey", https://doi.org/10.7910/DVN/DUS88V, Harvard Dataverse,V1
+
+[2]Education Highlight Tables, 2016, https://www12.statcan.gc.ca/census-recensement/2016/dp-pd/hlt-fst/edu-sco/index-eng.cfm
+
+[3]Seán Clarke and Cath Levett, 23 Oct 2019, Canada election 2019: full results，https://www.theguardian.com/world/2019/oct/22/canada-election-2019-full-results
+
+[4]Elections Step by Step, https://electionsanddemocracy.ca/canadas-elections/canadas-election-process/elections-step-step
+
+[5]Francesca Cassidy, September 10, 2019, Why people don’t vote, https://www.raconteur.net/public-sector/why-people-dont-vote/
+
+[6]Stephanie Glen, "Log Odds: Simple Definition & Examples, Conversions" From StatisticsHowTo.com: Elementary Statistics for the rest of us! https://www.statisticshowto.com/log-odds/
+
+[7]Sarang Narkhede, Jun 27, 2018, Understanding AUC - ROC Curve,
+https://towardsdatascience.com/understanding-auc-roc-curve-68b2303cc9c5
+
+[8]Canada election: Trudeau's Liberals win but lose majority, 22 October 2019, https://www.bbc.com/news/world-us-canada-50134640
+
+[9]Éric Grenier, Aug 25, 2019, How voter turnout might affect who wins in October, https://www.cbc.ca/news/politics/grenier-youth-turnout-1.5256600
+
+[10]Why Voting Is Important, May 11, 2020, https://www.nationalgeographic.org/article/why-voting-important/
+
+[11]Terence H. Qualter, John M. Wilson, Norman Ward, John C. Courtney, Garth Stevenson, February 7, 2006, Canadian Electoral System, https://www.thecanadianencyclopedia.ca/en/article/electoral-systems
+
+[12]pROC package
+https://www.rdocumentation.org/packages/pROC/versions/1.16.2
+
+[13]arm Package
+https://www.rdocumentation.org/packages/arm/versions/1.11-2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
